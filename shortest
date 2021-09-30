@@ -1,0 +1,135 @@
+#!/usr/bin/python3
+import sqlite3,sys,math,copy
+
+def id_query(name):
+    con = sqlite3.connect('a2.db')
+    cur = con.cursor()
+    cur.execute('SELECT id FROM actor WHERE lower(name) LIKE ?', (name,))
+    r = cur.fetchone()
+    con.close()
+    if not r == None:
+        return r[0]
+
+def name_query(actor_id):
+    con = sqlite3.connect('a2.db')
+    cur = con.cursor()
+    cur.execute('SELECT group_concat(name) FROM actor WHERE id=?', (actor_id,))
+    r = cur.fetchone()
+    con.close()
+    if not r == None:
+        return r[0]
+
+def neighbour(actor_id):
+    con = sqlite3.connect('a2.db')
+    cur = con.cursor()
+    cur.execute('''
+    SELECT a1.actor_id 
+    FROM movie m
+        JOIN acting a ON m.id=a.movie_id
+        JOIN actor ac ON a.actor_id = ac.id AND ac.id = ?
+        JOIN acting a1 on a1.movie_id = m.id AND a1.actor_id <> ac.id
+    GROUP BY a1.actor_id;
+    ''', (actor_id,))
+    r = cur.fetchall()
+    con.close()
+    return [i[0] for i in r if not i[0] == actor_id]
+    
+def distance(graph, src, dest):
+    graph[src] = 0
+    visited = set([src,])
+    path = [[] for i in range(len(graph))]
+    accessed = set()
+    while True:
+        nodes = neighbour(src)
+        for i in nodes:
+            if graph[i] > graph[src] + 1:
+                graph[i] = graph[src] + 1
+                path[i] = [src]
+            elif graph[i] == graph[src] + 1:
+                path[i].append(src)
+            accessed.add(i)
+        visited.add(src)
+        dis = math.inf
+        node = 0
+        for i in accessed:
+            if i not in visited and graph[src] < dis:
+                node = i
+                dis = graph[i]
+        if dis > 6 or dis > graph[dest]:
+            return path
+        visited.add(node)
+        src = node
+    return path
+
+def bfs(graph, src, dest):
+
+    def search(graph, src, dest):
+        if src in graph[dest]:
+            return [[src, dest],]
+
+        l = []
+        for i in graph[dest]:
+            paths = search(graph, src, i)
+            for i in range(len(paths)):
+                paths[i].append(dest)
+            l.extend(paths)
+        return l
+
+    return search(graph, src, dest)
+
+
+con = sqlite3.connect('a2.db')
+cur = con.cursor()
+
+if not len(sys.argv) == 3:
+    print("Usage: ./shortest actor_a actor_b")
+    sys.exit(1)
+
+src_name = sys.argv[1].lower()
+target_name = sys.argv[2].lower()
+if src_name == target_name:
+    sys.exit(1)
+src_id = id_query(src_name)
+target_id = id_query(target_name)
+
+cur.execute('SELECT count(*) FROM actor;')
+n = cur.fetchall()
+g = [math.inf for i in range(n[0][0]+1)]
+actors = distance(g, src_id, target_id)
+result = bfs(actors, src_id, target_id)
+print(result)
+for i in result:
+    i_index = result.index(i)
+    for j in i:
+        j_index = i.index(j)
+        if j == i[-1]:
+            result[i_index][j_index] = name_query(j)
+            continue
+        elif type(j) == tuple or type(i[j_index+1]) == tuple:
+            continue
+        
+        cur.execute('''
+        select m.title, m.year, group_concat(a.actor_id) as ids
+        from acting a 
+            join movie m on a.movie_id = m.id
+        group by m.title, m.year
+        having ids like ? and ids like ?;
+        ''', (f'%{j}%', f'%{result[i_index][j_index+1]}%'))
+
+        m = [(m[0], f'({m[1]})') for m in cur.fetchall()]
+        # if m == []:
+        #     result.pop[i]
+        #     continue
+        result[result.index(i)][j_index] = name_query(j)
+        [result.insert(i_index+k+1, copy.deepcopy(i)) for k in range(len(m)-1)]
+        [result[i_index+l].insert(j_index+1, m[l]) for l in range(len(m))]
+
+for i in result:
+    print(f'{result.index(i)+1}. ', end='')
+    for j in range(0, len(i), 2):
+        if i[j] == i[-1]:
+            print()
+            continue
+        if not i[j] == i[0]:
+            print('; ', end='')
+        print(f'{i[j]} was in {i[j+1][0]} {i[j+1][1]} with {i[j+2]}', end='')

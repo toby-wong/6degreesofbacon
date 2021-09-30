@@ -1,0 +1,49 @@
+#!/usr/bin/python3
+
+import sqlite3,sys
+
+if not len(sys.argv) == 3:
+	print('Usage:',sys.argv[0],'Genres MinRating')
+	sys.exit(1)
+
+g = sys.argv[1].lower().split('&')
+g = [f'lower(genre) LIKE "%{i}%"' for i in g]
+r = sys.argv[2]
+
+con = sqlite3.connect('a2.db')
+cur = con.cursor()
+
+query = '''
+SELECT * 
+FROM(
+    SELECT title, year, content_rating, lang, imdb_score, num_voted_users, group_concat(genre) AS genre
+    FROM (
+        SELECT m.title, m.year, m.content_rating, m.lang, r.imdb_score, r.num_voted_users, g.genre
+        FROM movie m
+            INNER JOIN genre g on m.id = g.movie_id
+            INNER JOIN rating r on m.id = r.movie_id
+        WHERE r.imdb_score >= ?
+        )
+    GROUP BY imdb_score, num_voted_users, title
+    ORDER BY imdb_score DESC, num_voted_users DESC)
+'''
+
+query += 'WHERE '
+if g:
+    for i, _ in enumerate(g):
+        query += (g[i])
+        if i == (len(g) - 1):
+            break
+        query += 'AND '
+query += ';'
+
+cur.execute(query, (r,))
+t = cur.fetchall()
+
+for i, _ in enumerate(t):
+	title, year, rating, lang, imdb, votes, genre = t[i]
+	l = [i for i in (year, rating, lang) if not i == None]
+
+	print(f'{i+1}. {title} ({", ".join(map(str,l))}) [{round(float(imdb),1)}, {votes}]')
+
+con.close()

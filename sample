@@ -1,0 +1,32 @@
+#!/usr/bin/python3
+
+"""
+This is a sample minimal program for COMP3311 21T1 Assignment 2 to illustrate how to write an 
+executable python code, take in a command line argument, and connect to a sqlite3 db.
+For simplicity (easier to read and follow), it does not include error checking,
+exception handling and comments.
+"""
+
+
+import sqlite3,sys
+
+if len(sys.argv) != 2 :
+  print("Usage:",sys.argv[0],"YEAR")
+  sys.exit(1)
+
+year = sys.argv[1]
+
+con = sqlite3.connect('a2.db')
+
+cur = con.cursor()
+
+cur.execute('SELECT title, year FROM movie WHERE year ={} ORDER BY title'.format(year))
+
+while True:
+  t = cur.fetchone()
+  if t == None:
+    break
+  x,y = t
+  print('{} ({})'.format(x,y))
+
+con.close()
