@@ -1,5 +1,5 @@
 # 6degreesofbacon
-## UNSW Assignment completed in 2021
 
-#### SQL Solution to Six Degrees of Kevin Bacon problem
+### Solution to Six Degrees of Kevin Bacon problem built for assignment (2021)
+#### Implementation uses Python and SQLite
 #### Database retrieved using IMDB
